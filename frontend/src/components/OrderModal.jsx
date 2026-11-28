@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { X, CheckCircle, ShoppingBag, MessageCircle, Package, ShieldCheck, Truck, AlertTriangle } from 'lucide-react';
+import { X, CheckCircle, ShoppingBag, MessageCircle, Package, ShieldCheck, Truck, AlertTriangle, WifiOff } from 'lucide-react';
 import { formatPrice } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { useOrders } from '../context/OrderContext';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export default function OrderModal({ product, isOpen, onClose, onOrderSuccess }) {
   const { currentUser } = useAuth();
   const { addOrder } = useOrders();
+  const isOnline = useOnlineStatus();
   const navigate = useNavigate();
   const [quantity, setQuantity] = useState(1);
   const [formData, setFormData] = useState({
@@ -58,6 +60,10 @@ export default function OrderModal({ product, isOpen, onClose, onOrderSuccess })
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!isOnline) {
+      setError('Anda sedang offline, tidak bisa melakukan pembelian saat ini.');
+      return;
+    }
     if (!formData.name.trim() || !formData.phone.trim() || !formData.address.trim()) {
       setError('Mohon lengkapi Nama, Nomor WhatsApp, dan Alamat Pengiriman.');
       return;
@@ -363,6 +369,13 @@ export default function OrderModal({ product, isOpen, onClose, onOrderSuccess })
                       </div>
                     </div>
 
+                    {!isOnline && (
+                      <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-xs rounded">
+                        <WifiOff size={16} className="shrink-0" />
+                        <span>Anda sedang offline, tidak bisa melakukan pembelian saat ini.</span>
+                      </div>
+                    )}
+
                     {error && (
                       <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-xs rounded">
                         <AlertTriangle size={16} />
@@ -390,10 +403,11 @@ export default function OrderModal({ product, isOpen, onClose, onOrderSuccess })
                       </div>
                       <button
                         type="submit"
-                        className="w-full sm:w-auto btn-primary py-3 px-8 text-xs tracking-widest font-bold flex items-center justify-center gap-2"
+                        disabled={!isOnline}
+                        className="w-full sm:w-auto btn-primary py-3 px-8 text-xs tracking-widest font-bold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        <ShoppingBag size={16} />
-                        KONFIRMASI PEMBELIAN
+                        {!isOnline ? <WifiOff size={16} /> : <ShoppingBag size={16} />}
+                        {!isOnline ? 'OFFLINE — TIDAK BISA BELI' : 'KONFIRMASI PEMBELIAN'}
                       </button>
                     </div>
                   </>

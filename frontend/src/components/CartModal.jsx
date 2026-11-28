@@ -1,17 +1,20 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShoppingCart, Trash2, Plus, Minus, ArrowRight, LogIn, ShoppingBag } from 'lucide-react';
+import { X, ShoppingCart, Trash2, Plus, Minus, ArrowRight, LogIn, ShoppingBag, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { formatPrice } from '../utils/helpers';
 
 export default function CartModal({ isOpen, onClose, onCheckoutItem, onLoginRequest }) {
   const { items, updateQty, removeFromCart, clearCart, totalItems, totalPrice } = useCart();
   const { isLoggedIn } = useAuth();
+  const isOnline = useOnlineStatus();
 
   if (!isOpen) return null;
 
   const handleCheckout = (item) => {
+    if (!isOnline) return;
     if (!isLoggedIn) {
       onClose();
       onLoginRequest();
@@ -144,8 +147,9 @@ export default function CartModal({ isOpen, onClose, onCheckoutItem, onLoginRequ
                       </button>
                       <button
                         onClick={() => handleCheckout(item)}
-                        className="p-1.5 text-vg-gray hover:text-vg-white transition-colors"
-                        title="Checkout item ini"
+                        disabled={!isOnline}
+                        className="p-1.5 text-vg-gray hover:text-vg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={isOnline ? 'Checkout item ini' : 'Anda sedang offline, tidak bisa membeli'}
                       >
                         <ShoppingBag size={14} />
                       </button>
@@ -163,10 +167,17 @@ export default function CartModal({ isOpen, onClose, onCheckoutItem, onLoginRequ
                 <span className="text-xs text-vg-gray uppercase tracking-widest">Total ({totalItems} set)</span>
                 <span className="font-black text-vg-white text-sm">{formatPrice(totalPrice)}</span>
               </div>
+              {!isOnline && (
+                <div className="flex items-center gap-2 p-2.5 bg-red-500/10 border border-red-500/30 text-red-400 text-[11px] rounded">
+                  <WifiOff size={14} className="shrink-0" />
+                  <span>Anda sedang offline, tidak bisa membeli saat ini.</span>
+                </div>
+              )}
               {!isLoggedIn ? (
                 <button
                   onClick={() => { onClose(); onLoginRequest(); }}
-                  className="w-full btn-primary flex items-center justify-center gap-2 py-3 text-xs"
+                  disabled={!isOnline}
+                  className="w-full btn-primary flex items-center justify-center gap-2 py-3 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <LogIn size={14} />
                   LOGIN UNTUK CHECKOUT

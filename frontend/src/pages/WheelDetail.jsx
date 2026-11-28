@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, ArrowLeft, ExternalLink, AlertCircle, ShoppingBag, ShoppingCart, ShieldCheck, Check, LogIn } from 'lucide-react';
+import { Heart, ArrowLeft, ExternalLink, AlertCircle, ShoppingBag, ShoppingCart, ShieldCheck, Check, LogIn, WifiOff } from 'lucide-react';
 import { productsApi } from '../services/api';
 import { useFavorites } from '../context/FavoritesContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import ProductCard from '../components/ProductCard';
 import OrderModal from '../components/OrderModal';
 import AuthModal from '../components/AuthModal';
@@ -19,6 +20,7 @@ export default function WheelDetail() {
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { addToCart, isInCart } = useCart();
   const { isLoggedIn } = useAuth();
+  const isOnline = useOnlineStatus();
 
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
@@ -88,6 +90,7 @@ export default function WheelDetail() {
   };
 
   const handleOrderClick = () => {
+    if (!isOnline) return;
     if (!isLoggedIn) {
       setIsAuthModalOpen(true);
       return;
@@ -318,11 +321,13 @@ export default function WheelDetail() {
               {/* Pesan / Beli */}
               <button
                 onClick={handleOrderClick}
-                disabled={(currentStock ?? product.stock ?? 4) <= 0}
-                className="flex-1 btn-primary py-3 px-4 text-xs tracking-widest font-black uppercase flex items-center justify-center gap-2 shadow-lg hover:shadow-white/10 transition-all disabled:opacity-40"
+                disabled={!isOnline || (currentStock ?? product.stock ?? 4) <= 0}
+                className="flex-1 btn-primary py-3 px-4 text-xs tracking-widest font-black uppercase flex items-center justify-center gap-2 shadow-lg hover:shadow-white/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <ShoppingBag size={18} />
-                {!isLoggedIn
+                {!isOnline ? <WifiOff size={18} /> : <ShoppingBag size={18} />}
+                {!isOnline
+                  ? 'OFFLINE — TIDAK BISA MEMBELI'
+                  : !isLoggedIn
                   ? 'LOGIN UNTUK MEMESAN'
                   : (currentStock ?? product.stock ?? 4) <= 0
                   ? 'STOK SAAT INI HABIS'
@@ -330,7 +335,14 @@ export default function WheelDetail() {
               </button>
             </div>
 
-            {!isLoggedIn && (
+            {!isOnline && (
+              <div className="flex items-center justify-center gap-2 p-2.5 mb-2 bg-red-500/10 border border-red-500/30 text-red-400 text-xs rounded text-center">
+                <WifiOff size={14} className="shrink-0" />
+                <span>Anda sedang offline, tidak bisa melakukan pembelian saat ini.</span>
+              </div>
+            )}
+
+            {isOnline && !isLoggedIn && (
               <p className="text-center text-[11px] text-vg-gray mb-2">
                 <span className="text-amber-400">⚠</span> Kamu perlu{' '}
                 <button

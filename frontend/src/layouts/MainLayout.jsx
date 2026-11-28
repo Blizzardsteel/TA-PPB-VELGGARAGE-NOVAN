@@ -1,26 +1,12 @@
-import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { WifiOff } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import BottomNav from '../components/BottomNav';
 import Footer from '../components/Footer';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export default function MainLayout() {
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator !== 'undefined' ? navigator.onLine : true
-  );
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  const isOnline = useOnlineStatus();
 
   return (
     <div className="min-h-screen flex flex-col bg-vg-black pb-16 md:pb-0 overflow-x-hidden">
