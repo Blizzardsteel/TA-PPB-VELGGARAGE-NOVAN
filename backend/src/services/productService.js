@@ -14,7 +14,31 @@ function attachBrandAndSpecs(products) {
   });
 }
 
-function applyFilters(products, { brand, category, diameter, q, sort, featured }) {
+function slugify(text) {
+  return String(text || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function normalizeSpecs(specs, productId) {
+  if (!Array.isArray(specs)) return [];
+  return specs
+    .filter((s) => s && (s.diameter || s.width || s.pcd || s.offset_range || s.finish || s.weight_kg || s.load_rating))
+    .map((s) => ({
+      product_id: productId,
+      diameter: s.diameter !== '' && s.diameter !== null && s.diameter !== undefined ? Number(s.diameter) : null,
+      width: s.width !== '' && s.width !== null && s.width !== undefined ? Number(s.width) : null,
+      pcd: s.pcd || null,
+      offset_range: s.offset_range || null,
+      finish: s.finish || null,
+      weight_kg: s.weight_kg !== '' && s.weight_kg !== null && s.weight_kg !== undefined ? Number(s.weight_kg) : null,
+      load_rating: s.load_rating !== '' && s.load_rating !== null && s.load_rating !== undefined ? Number(s.load_rating) : null,
+    }));
+}
+
+function applyFilters(products, { brand, category, construction_type, diameter, q, sort, featured }) {
   let result = [...products];
 
   if (featured === true || featured === 'true') {
@@ -32,6 +56,12 @@ function applyFilters(products, { brand, category, diameter, q, sort, featured }
   if (category) {
     result = result.filter(
       (p) => p.category && p.category.toLowerCase() === category.toLowerCase()
+    );
+  }
+
+  if (construction_type) {
+    result = result.filter(
+      (p) => p.construction_type && p.construction_type.toLowerCase() === construction_type.toLowerCase()
     );
   }
 
@@ -91,6 +121,10 @@ export const productService = {
 
         if (filters.category) {
           query = query.ilike('category', filters.category);
+        }
+
+        if (filters.construction_type) {
+          query = query.ilike('construction_type', filters.construction_type);
         }
 
         if (filters.featured === true || filters.featured === 'true') {
@@ -251,5 +285,148 @@ export const productService = {
 
     const cats = [...new Set(mockProducts.map((p) => p.category).filter(Boolean))].sort();
     return cats;
+  },
+
+  async create(payload) {
+    const baseSlug = slugify(payload.slug || payload.name) || `wheel-${Date.now()}`;
+    const row = {
+      brand_id: payload.brand_id ? Number(payload.brand_id) : null,
+      name: String(payload.name).trim(),
+      slug: `${baseSlug}-${Date.now().toString().slice(-4)}`,
+      model: payload.model ? String(payload.model).trim() : String(payload.name).trim(),
+      category: payload.category || 'Sport',
+      construction_type: payload.construction_type || 'Forged',
+      material: payload.material || null,
+      description: payload.description || null,
+      price: payload.price !== undefined && payload.price !== '' ? Number(payload.price) : 45000000,
+      stock: payload.stock !== undefined && payload.stock !== '' ? Number(payload.stock) : 5,
+      image_url: payload.image_url || null,
+      manufacturer_source_url: payload.manufacturer_source_url || null,
+      is_featured: Boolean(payload.is_featured),
+    };
+
+    if (supabase) {
+      try {
+        const { data: created, error } = await supabase
+          .from('products')
+          .insert(row)
+          .select()
+          .single();
+
+        if (!error && created) {
+          const specsToInsert = normalizeSpecs(payload.specifications, created.id);
+          if (specsToInsert.length > 0) {
+            const { error: specError } = await supabase
+              .from('product_specifications')
+              .insert(specsToInsert);
+            if (specError) console.warn('[Supabase spec insert error]:', specError.message);
+          }
+          return await this.getById(created.id);
+        }
+        if (error) console.warn('[Supabase product create error, using mock fallback]:', error.message);
+      } catch (err) {
+        console.warn('[Supabase product create failed, using mock fallback]:', err.message);
+      }
+    }
+
+    const nextId = Math.max(0, ...mockProducts.map((p) => Number(p.id) || 0)) + 1;
+    const created = {
+      id: nextId,
+      ...row,
+      created_at: new Date().toISOString(),
+    };
+    mockProducts.push(created);
+
+    const specsToInsert = normalizeSpecs(payload.specifications, nextId);
+    let nextSpecId = Math.max(0, ...mockSpecs.map((s) => Number(s.id) || 0)) + 1;
+    for (const spec of specsToInsert) {
+      mockSpecs.push({ id: nextSpecId++, ...spec });
+    }
+
+    return attachBrandAndSpecs([created])[0];
+  },
+
+  async update(id, payload) {
+    const updates = {};
+    if (payload.brand_id !== undefined) updates.brand_id = payload.brand_id ? Number(payload.brand_id) : null;
+    if (payload.name !== undefined) {
+      updates.name = String(payload.name).trim();
+      if (payload.slug !== undefined) updates.slug = slugify(payload.slug);
+    }
+    if (payload.model !== undefined) updates.model = payload.model || null;
+    if (payload.category !== undefined) updates.category = payload.category || null;
+    if (payload.construction_type !== undefined) updates.construction_type = payload.construction_type || null;
+    if (payload.material !== undefined) updates.material = payload.material || null;
+    if (payload.description !== undefined) updates.description = payload.description || null;
+    if (payload.price !== undefined && payload.price !== '') updates.price = Number(payload.price);
+    if (payload.stock !== undefined && payload.stock !== '') updates.stock = Number(payload.stock);
+    if (payload.image_url !== undefined) updates.image_url = payload.image_url || null;
+    if (payload.manufacturer_source_url !== undefined) updates.manufacturer_source_url = payload.manufacturer_source_url || null;
+    if (payload.is_featured !== undefined) updates.is_featured = Boolean(payload.is_featured);
+
+    if (supabase) {
+      try {
+        const { data: updated, error } = await supabase
+          .from('products')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (!error && updated) {
+          if (Array.isArray(payload.specifications)) {
+            await supabase.from('product_specifications').delete().eq('product_id', id);
+            const specsToInsert = normalizeSpecs(payload.specifications, Number(id));
+            if (specsToInsert.length > 0) {
+              await supabase.from('product_specifications').insert(specsToInsert);
+            }
+          }
+          return await this.getById(id);
+        }
+        if (error) console.warn('[Supabase product update error, using mock fallback]:', error.message);
+      } catch (err) {
+        console.warn('[Supabase product update failed, using mock fallback]:', err.message);
+      }
+    }
+
+    const idx = mockProducts.findIndex((p) => p.id === Number(id));
+    if (idx === -1) return null;
+    mockProducts[idx] = { ...mockProducts[idx], ...updates };
+
+    if (Array.isArray(payload.specifications)) {
+      for (let i = mockSpecs.length - 1; i >= 0; i--) {
+        if (mockSpecs[i].product_id === Number(id)) {
+          mockSpecs.splice(i, 1);
+        }
+      }
+      let nextSpecId = Math.max(0, ...mockSpecs.map((s) => Number(s.id) || 0)) + 1;
+      for (const spec of normalizeSpecs(payload.specifications, Number(id))) {
+        mockSpecs.push({ id: nextSpecId++, ...spec });
+      }
+    }
+
+    return attachBrandAndSpecs([mockProducts[idx]])[0];
+  },
+
+  async remove(id) {
+    if (supabase) {
+      try {
+        const { error } = await supabase.from('products').delete().eq('id', id);
+        if (!error) return true;
+        console.warn('[Supabase product delete error, using mock fallback]:', error.message);
+      } catch (err) {
+        console.warn('[Supabase product delete failed, using mock fallback]:', err.message);
+      }
+    }
+
+    const idx = mockProducts.findIndex((p) => p.id === Number(id));
+    if (idx === -1) return false;
+    mockProducts.splice(idx, 1);
+    for (let i = mockSpecs.length - 1; i >= 0; i--) {
+      if (mockSpecs[i].product_id === Number(id)) {
+        mockSpecs.splice(i, 1);
+      }
+    }
+    return true;
   },
 };

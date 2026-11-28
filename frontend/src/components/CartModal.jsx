@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingCart, Trash2, Plus, Minus, ArrowRight, LogIn, ShoppingBag, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -5,16 +6,21 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { formatPrice } from '../utils/helpers';
+import OfflineWarningModal from './OfflineWarningModal';
 
 export default function CartModal({ isOpen, onClose, onCheckoutItem, onLoginRequest }) {
   const { items, updateQty, removeFromCart, clearCart, totalItems, totalPrice } = useCart();
   const { isLoggedIn } = useAuth();
   const isOnline = useOnlineStatus();
+  const [offlineWarningOpen, setOfflineWarningOpen] = useState(false);
 
   if (!isOpen) return null;
 
   const handleCheckout = (item) => {
-    if (!isOnline) return;
+    if (!isOnline) {
+      setOfflineWarningOpen(true);
+      return;
+    }
     if (!isLoggedIn) {
       onClose();
       onLoginRequest();
@@ -147,8 +153,7 @@ export default function CartModal({ isOpen, onClose, onCheckoutItem, onLoginRequ
                       </button>
                       <button
                         onClick={() => handleCheckout(item)}
-                        disabled={!isOnline}
-                        className="p-1.5 text-vg-gray hover:text-vg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className={`p-1.5 text-vg-gray hover:text-vg-white transition-colors ${!isOnline ? 'opacity-50' : ''}`}
                         title={isOnline ? 'Checkout item ini' : 'Anda sedang offline, tidak bisa membeli'}
                       >
                         <ShoppingBag size={14} />
@@ -175,9 +180,15 @@ export default function CartModal({ isOpen, onClose, onCheckoutItem, onLoginRequ
               )}
               {!isLoggedIn ? (
                 <button
-                  onClick={() => { onClose(); onLoginRequest(); }}
-                  disabled={!isOnline}
-                  className="w-full btn-primary flex items-center justify-center gap-2 py-3 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    if (!isOnline) {
+                      setOfflineWarningOpen(true);
+                      return;
+                    }
+                    onClose();
+                    onLoginRequest();
+                  }}
+                  className="w-full btn-primary flex items-center justify-center gap-2 py-3 text-xs"
                 >
                   <LogIn size={14} />
                   LOGIN UNTUK CHECKOUT
@@ -199,6 +210,10 @@ export default function CartModal({ isOpen, onClose, onCheckoutItem, onLoginRequ
           )}
         </motion.div>
       </div>
+      <OfflineWarningModal
+        isOpen={offlineWarningOpen}
+        onClose={() => setOfflineWarningOpen(false)}
+      />
     </AnimatePresence>
   );
 }

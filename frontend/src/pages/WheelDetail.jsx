@@ -10,6 +10,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import ProductCard from '../components/ProductCard';
 import OrderModal from '../components/OrderModal';
 import AuthModal from '../components/AuthModal';
+import OfflineWarningModal from '../components/OfflineWarningModal';
 import { DetailSkeleton, ProductCardSkeleton } from '../components/LoadingSkeleton';
 import { formatPrice } from '../utils/helpers';
 import { fallbackProducts } from '../data/fallbackCatalog';
@@ -29,6 +30,7 @@ export default function WheelDetail() {
   const [imgError, setImgError] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isOfflineWarningOpen, setIsOfflineWarningOpen] = useState(false);
   const [currentStock, setCurrentStock] = useState(null);
 
   const fav = product ? isFavorite(product.id) : false;
@@ -90,7 +92,10 @@ export default function WheelDetail() {
   };
 
   const handleOrderClick = () => {
-    if (!isOnline) return;
+    if (!isOnline) {
+      setIsOfflineWarningOpen(true);
+      return;
+    }
     if (!isLoggedIn) {
       setIsAuthModalOpen(true);
       return;
@@ -321,16 +326,16 @@ export default function WheelDetail() {
               {/* Pesan / Beli */}
               <button
                 onClick={handleOrderClick}
-                disabled={!isOnline || (currentStock ?? product.stock ?? 4) <= 0}
-                className="flex-1 btn-primary py-3 px-4 text-xs tracking-widest font-black uppercase flex items-center justify-center gap-2 shadow-lg hover:shadow-white/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={(currentStock ?? product.stock ?? 4) <= 0}
+                className={`flex-1 btn-primary py-3 px-4 text-xs tracking-widest font-black uppercase flex items-center justify-center gap-2 shadow-lg hover:shadow-white/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  !isOnline ? 'opacity-70' : ''
+                }`}
               >
                 {!isOnline ? <WifiOff size={18} /> : <ShoppingBag size={18} />}
-                {!isOnline
-                  ? 'OFFLINE — TIDAK BISA MEMBELI'
+                {(currentStock ?? product.stock ?? 4) <= 0
+                  ? 'STOK SAAT INI HABIS'
                   : !isLoggedIn
                   ? 'LOGIN UNTUK MEMESAN'
-                  : (currentStock ?? product.stock ?? 4) <= 0
-                  ? 'STOK SAAT INI HABIS'
                   : 'PESAN / BELI SEKARANG'}
               </button>
             </div>
@@ -399,6 +404,12 @@ export default function WheelDetail() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         initialTab="login"
+      />
+
+      {/* Offline Warning Modal */}
+      <OfflineWarningModal
+        isOpen={isOfflineWarningOpen}
+        onClose={() => setIsOfflineWarningOpen(false)}
       />
 
       {/* Related Products */}

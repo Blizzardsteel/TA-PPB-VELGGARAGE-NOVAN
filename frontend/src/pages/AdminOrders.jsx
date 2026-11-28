@@ -15,11 +15,14 @@ import {
   Mail,
   LogIn,
   Package,
+  Disc,
+  Tag,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useOrders, ORDER_STATUS, ORDER_STATUS_META } from '../context/OrderContext';
 import { formatPrice } from '../utils/helpers';
 import AuthModal from '../components/AuthModal';
+import AdminCatalogManager from '../components/AdminCatalogManager';
 
 const ADMIN_FILTERS = [
   { key: 'all', label: 'Semua' },
@@ -35,6 +38,7 @@ export default function AdminOrders() {
   const { orders, updateOrderStatus } = useOrders();
 
   const [authOpen, setAuthOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'wheels' | 'brands'
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
@@ -129,15 +133,58 @@ export default function AdminOrders() {
       exit={{ opacity: 0 }}
       className="max-w-6xl mx-auto px-4 md:px-6 py-10 space-y-8"
     >
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-vg-border pb-6">
+      {/* Header & Tabs */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-vg-border pb-6">
         <div>
           <p className="text-xs uppercase tracking-widest text-emerald-400 font-semibold mb-1">
             Admin Dashboard
           </p>
-          <h1 className="section-title">Manajemen &amp; ACC Pesanan</h1>
+          <h1 className="section-title">
+            {activeTab === 'orders'
+              ? 'Manajemen & ACC Pesanan'
+              : activeTab === 'wheels'
+              ? 'Kelola Katalog Velg'
+              : 'Kelola Brand Velg'}
+          </h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border rounded flex items-center gap-2 transition-colors ${
+              activeTab === 'orders'
+                ? 'bg-vg-white text-vg-black border-vg-white'
+                : 'border-vg-border text-vg-gray hover:text-vg-white'
+            }`}
+          >
+            <Package size={14} /> Pesanan
+          </button>
+          <button
+            onClick={() => setActiveTab('wheels')}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border rounded flex items-center gap-2 transition-colors ${
+              activeTab === 'wheels'
+                ? 'bg-vg-white text-vg-black border-vg-white'
+                : 'border-vg-border text-vg-gray hover:text-vg-white'
+            }`}
+          >
+            <Disc size={14} /> Kelola Velg
+          </button>
+          <button
+            onClick={() => setActiveTab('brands')}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border rounded flex items-center gap-2 transition-colors ${
+              activeTab === 'brands'
+                ? 'bg-vg-white text-vg-black border-vg-white'
+                : 'border-vg-border text-vg-gray hover:text-vg-white'
+            }`}
+          >
+            <Tag size={14} /> Kelola Brands
+          </button>
         </div>
       </div>
+
+      {activeTab !== 'orders' ? (
+        <AdminCatalogManager mode={activeTab} />
+      ) : (
+        <>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -435,6 +482,8 @@ export default function AdminOrders() {
             );
           })}
         </div>
+      )}
+        </>
       )}
     </motion.div>
   );

@@ -5,6 +5,9 @@ import {
   getByBrand,
   getByCategory,
   getById,
+  create,
+  update,
+  remove,
 } from '../controllers/productController.js';
 
 const router = Router();
@@ -15,5 +18,8 @@ router.get('/brand/:brandId', getByBrand);
 router.get('/category/:category', getByCategory);
 router.get('/', getAll);
 router.get('/:id', getById);
+router.post('/', create);
+router.put('/:id', update);
+router.delete('/:id', remove);
 
 export default router;

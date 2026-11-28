@@ -3,6 +3,7 @@ import {
   buildCacheKey,
   getCachedResponse,
   setCachedResponse,
+  invalidateApiCache,
   getOfflineProducts,
   getOfflineProductById,
   getOfflineBrandById,
@@ -51,6 +52,15 @@ async function cachedGet(url, config = {}, offlineLookup) {
   }
 }
 
+async function mutateRequest(method, url, data) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error('Anda sedang offline, tidak bisa menyimpan perubahan ke database.');
+  }
+  const res = await api.request({ method, url, data });
+  invalidateApiCache();
+  return res;
+}
+
 export const productsApi = {
   getAll: (params) => cachedGet('/api/products', { params }, () => getOfflineProducts(params)),
   getById: (id) => cachedGet(`/api/products/${id}`, {}, () => getOfflineProductById(id)),
@@ -59,11 +69,17 @@ export const productsApi = {
     cachedGet(`/api/products/brand/${brandId}`, {}, () => getOfflineProducts({ brand: brandId })),
   getByCategory: (category) =>
     cachedGet(`/api/products/category/${category}`, {}, () => getOfflineProducts({ category })),
+  create: (payload) => mutateRequest('post', '/api/products', payload),
+  update: (id, payload) => mutateRequest('put', `/api/products/${id}`, payload),
+  remove: (id) => mutateRequest('delete', `/api/products/${id}`),
 };
 
 export const brandsApi = {
   getAll: () => cachedGet('/api/brands'),
   getById: (id) => cachedGet(`/api/brands/${id}`, {}, () => getOfflineBrandById(id)),
+  create: (payload) => mutateRequest('post', '/api/brands', payload),
+  update: (id, payload) => mutateRequest('put', `/api/brands/${id}`, payload),
+  remove: (id) => mutateRequest('delete', `/api/brands/${id}`),
 };
 
 export const categoriesApi = {
