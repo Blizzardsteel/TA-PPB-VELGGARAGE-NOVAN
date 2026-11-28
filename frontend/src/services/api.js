@@ -57,7 +57,7 @@ async function mutateRequest(method, url, data) {
     throw new Error('Anda sedang offline, tidak bisa menyimpan perubahan ke database.');
   }
   const res = await api.request({ method, url, data });
-  invalidateApiCache();
+  await invalidateApiCache();
   return res;
 }
 

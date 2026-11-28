@@ -65,19 +65,35 @@ export const brandService = {
     };
 
     if (supabase) {
-      try {
-        const { data, error } = await supabase
+      let { data, error } = await supabase
+        .from('brands')
+        .insert(row)
+        .select()
+        .single();
+
+      // Retry once with explicit next id if serial sequence is out of sync
+      if (error && error.code === '23505' && String(error.message).includes('_pkey')) {
+        const { data: maxRow } = await supabase
           .from('brands')
-          .insert(row)
-          .select()
+          .select('id')
+          .order('id', { ascending: false })
+          .limit(1)
           .single();
-        if (!error && data) return data;
-        if (error) {
-          console.warn('[Supabase brand create error, using mock fallback]:', error.message);
-          throw new Error(error.message);
+        const nextDbId = (maxRow?.id || 0) + 1;
+        ({ data, error } = await supabase
+          .from('brands')
+          .insert({ id: nextDbId, ...row })
+          .select()
+          .single());
+      }
+
+      if (!error && data) return data;
+      if (error) {
+        const isNetworkError = String(error.message || '').toLowerCase().includes('fetch failed');
+        if (!isNetworkError) {
+          throw new Error(`Supabase brand insert failed: ${error.message}`);
         }
-      } catch (err) {
-        console.warn('[Supabase brand create failed, using mock fallback]:', err.message);
+        console.warn('[Supabase brand create network error, using mock fallback]:', error.message);
       }
     }
 

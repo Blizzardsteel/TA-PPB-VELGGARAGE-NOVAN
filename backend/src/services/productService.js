@@ -306,26 +306,44 @@ export const productService = {
     };
 
     if (supabase) {
-      try {
-        const { data: created, error } = await supabase
-          .from('products')
-          .insert(row)
-          .select()
-          .single();
+      let { data: created, error } = await supabase
+        .from('products')
+        .insert(row)
+        .select()
+        .single();
 
-        if (!error && created) {
-          const specsToInsert = normalizeSpecs(payload.specifications, created.id);
-          if (specsToInsert.length > 0) {
-            const { error: specError } = await supabase
-              .from('product_specifications')
-              .insert(specsToInsert);
-            if (specError) console.warn('[Supabase spec insert error]:', specError.message);
-          }
-          return await this.getById(created.id);
+      // Retry once with explicit next id if serial sequence is out of sync
+      if (error && error.code === '23505' && String(error.message).includes('_pkey')) {
+        const { data: maxRow } = await supabase
+          .from('products')
+          .select('id')
+          .order('id', { ascending: false })
+          .limit(1)
+          .single();
+        const nextDbId = (maxRow?.id || 0) + 1;
+        ({ data: created, error } = await supabase
+          .from('products')
+          .insert({ id: nextDbId, ...row })
+          .select()
+          .single());
+      }
+
+      if (!error && created) {
+        const specsToInsert = normalizeSpecs(payload.specifications, created.id);
+        if (specsToInsert.length > 0) {
+          const { error: specError } = await supabase
+            .from('product_specifications')
+            .insert(specsToInsert);
+          if (specError) console.warn('[Supabase spec insert error]:', specError.message);
         }
-        if (error) console.warn('[Supabase product create error, using mock fallback]:', error.message);
-      } catch (err) {
-        console.warn('[Supabase product create failed, using mock fallback]:', err.message);
+        return await this.getById(created.id);
+      }
+      if (error) {
+        const isNetworkError = String(error.message || '').toLowerCase().includes('fetch failed');
+        if (!isNetworkError) {
+          throw new Error(`Supabase product insert failed: ${error.message}`);
+        }
+        console.warn('[Supabase product create network error, using mock fallback]:', error.message);
       }
     }
 

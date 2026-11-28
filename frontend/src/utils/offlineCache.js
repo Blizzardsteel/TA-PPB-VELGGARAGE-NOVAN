@@ -37,7 +37,7 @@ export function setCachedResponse(key, data) {
   }
 }
 
-export function invalidateApiCache() {
+export async function invalidateApiCache() {
   try {
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -49,6 +49,14 @@ export function invalidateApiCache() {
     keysToRemove.forEach((k) => localStorage.removeItem(k));
   } catch {
     // Ignore storage errors
+  }
+
+  try {
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      await window.caches.delete('velggarage-api-cache');
+    }
+  } catch {
+    // Ignore CacheStorage errors
   }
 }
 
