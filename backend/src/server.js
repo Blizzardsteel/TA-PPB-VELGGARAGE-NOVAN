@@ -18,6 +18,7 @@ app.use(morgan('dev'));
 app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 app.use('/api/brands', brandRoutes);
 app.use('/api/products', productRoutes);
@@ -25,4 +26,8 @@ app.use('/api/categories', categoryRoutes);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => console.log(`VelgGarage API running on port ${PORT}`));
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => console.log(`VelgGarage API running on port ${PORT}`));
+}
+
+export default app;
