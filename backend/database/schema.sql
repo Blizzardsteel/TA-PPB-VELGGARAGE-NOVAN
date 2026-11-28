@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS products (
   construction_type VARCHAR(100),
   material VARCHAR(100),
   description TEXT,
+  price NUMERIC(12, 2) DEFAULT 45000000,
+  stock INTEGER DEFAULT 5,
   image_url TEXT,
   image_source_url TEXT,
   manufacturer_source_url TEXT,

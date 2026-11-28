@@ -19,7 +19,7 @@ const ctaVariants = {
 
 export default function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-vg-black">
+    <section className="relative min-h-[82vh] md:min-h-screen py-16 md:py-0 flex items-center justify-center overflow-hidden bg-vg-black">
       {/* Background Gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-vg-black via-vg-dark to-vg-black" />
       <div
@@ -56,7 +56,7 @@ export default function HeroSection() {
 
           <motion.h1
             variants={textVariants}
-            className="text-5xl md:text-7xl lg:text-8xl font-black uppercase tracking-tight text-vg-white leading-none"
+            className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black uppercase tracking-tight text-vg-white leading-none"
           >
             FIND YOUR
             <br />
@@ -77,15 +77,15 @@ export default function HeroSection() {
 
           <motion.div
             variants={ctaVariants}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
+            className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-4"
           >
             <Link
               to="/wheels"
-              className="flex items-center gap-2 btn-primary text-sm"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 btn-primary text-sm"
             >
               EXPLORE COLLECTION <ArrowRight size={16} />
             </Link>
-            <Link to="/brands" className="btn-outline text-sm">
+            <Link to="/brands" className="w-full sm:w-auto text-center btn-outline text-sm">
               VIEW BRANDS
             </Link>
           </motion.div>

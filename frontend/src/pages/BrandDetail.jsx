@@ -5,6 +5,7 @@ import { ArrowLeft, Globe, AlertCircle } from 'lucide-react';
 import { brandsApi } from '../services/api';
 import ProductCard from '../components/ProductCard';
 import { ProductCardSkeleton } from '../components/LoadingSkeleton';
+import { fallbackBrands, fallbackProducts } from '../data/fallbackCatalog';
 
 const containerVariants = {
   hidden: {},
@@ -27,7 +28,15 @@ export default function BrandDetail() {
         const data = res.data;
         setBrand(data.data || data);
       } catch (err) {
-        setError(err.message || 'Failed to load brand');
+        console.warn('Brand detail API error, using fallback:', err.message);
+        const fbBrand = fallbackBrands.find((b) => String(b.id) === String(id));
+        if (fbBrand) {
+          const prods = fallbackProducts.filter((p) => p.brand_id === fbBrand.id);
+          setBrand({ ...fbBrand, products: prods });
+          setError(null);
+        } else {
+          setError(err.message || 'Failed to load brand');
+        }
       } finally {
         setLoading(false);
       }
@@ -82,7 +91,7 @@ export default function BrandDetail() {
         className="mb-12 pb-10 border-b border-vg-border"
       >
         <div className="flex items-start gap-6">
-          <div className="w-20 h-20 bg-vg-dark border border-vg-border rounded flex items-center justify-center shrink-0">
+          <div className="w-20 h-20 bg-vg-dark border border-vg-border rounded flex items-center justify-center shrink-0 p-3 overflow-hidden">
             {brand.logo_url ? (
               <img src={brand.logo_url} alt={brand.name} className="w-full h-full object-contain" />
             ) : (

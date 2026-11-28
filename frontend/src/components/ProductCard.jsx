@@ -1,16 +1,20 @@
 import { Link } from 'react-router-dom';
-import { Heart } from 'lucide-react';
+import { Heart, ShoppingCart, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useFavorites } from '../context/FavoritesContext';
+import { useCart } from '../context/CartContext';
+import { formatPrice } from '../utils/helpers';
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
-export default function ProductCard({ product, showRemove = false }) {
+export default function ProductCard({ product, showRemove = false, onLoginRequest }) {
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const { addToCart, isInCart } = useCart();
   const fav = isFavorite(product.id);
+  const inCart = isInCart(product.id);
 
   const handleFavToggle = (e) => {
     e.preventDefault();
@@ -22,6 +26,15 @@ export default function ProductCard({ product, showRemove = false }) {
     }
   };
 
+  const handleAddToCart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if ((product.stock ?? 0) <= 0) return;
+    addToCart(product, 1);
+  };
+
+  const isOutOfStock = (product.stock ?? 0) <= 0;
+
   return (
     <motion.div
       variants={cardVariants}
@@ -30,21 +43,19 @@ export default function ProductCard({ product, showRemove = false }) {
       className="card-base group relative flex flex-col"
     >
       {/* Image */}
-      <div className="relative aspect-square bg-vg-dark overflow-hidden">
+      <div className="relative aspect-square bg-vg-dark overflow-hidden flex items-center justify-center p-3">
         {product.image_url ? (
           <>
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
               onError={(e) => {
                 e.target.style.display = 'none';
                 if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
               }}
             />
-            <div
-              className="absolute inset-0 items-center justify-center hidden bg-vg-dark"
-            >
+            <div className="absolute inset-0 items-center justify-center hidden bg-vg-dark">
               <span className="text-vg-gray text-xs uppercase tracking-widest">No Image</span>
             </div>
           </>
@@ -73,39 +84,80 @@ export default function ProductCard({ product, showRemove = false }) {
             Featured
           </div>
         )}
+
+        {/* Out of stock overlay */}
+        {isOutOfStock && (
+          <div className="absolute inset-0 bg-vg-black/60 flex items-center justify-center">
+            <span className="text-vg-gray text-xs font-bold uppercase tracking-widest border border-vg-border px-3 py-1">
+              Stok Habis
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Content */}
-      <div className="p-4 flex flex-col flex-1">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <p className="text-vg-gray text-xs uppercase tracking-widest">
+      <div className="p-3 sm:p-4 flex flex-col flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-1.5 mb-1 min-w-0">
+          <p className="text-vg-gray text-[10px] sm:text-xs uppercase tracking-wider sm:tracking-widest truncate">
             {product.brand?.name || product.brand_name || 'Unknown Brand'}
           </p>
+          <span className={`shrink-0 text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 uppercase tracking-wider rounded font-medium border ${
+            isOutOfStock
+              ? 'border-red-500/40 text-red-400 bg-red-500/10'
+              : (product.stock ?? 4) <= 2
+              ? 'border-amber-500/40 text-amber-400 bg-amber-500/10'
+              : 'border-vg-border text-vg-gray'
+          }`}>
+            {isOutOfStock ? 'Habis' : `Sisa ${product.stock ?? 4}`}
+          </span>
+        </div>
+        <h3 className="font-bold text-vg-white text-xs sm:text-sm leading-tight mb-2 line-clamp-2">
+          {product.name}
+        </h3>
+
+        {/* Price & Construction */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2 text-xs mb-3 pt-1.5 border-t border-vg-border/40 min-w-0">
+          <span className="font-bold text-vg-white truncate">
+            {formatPrice(product.price || 45000000)}
+          </span>
           {product.construction_type && (
-            <span className="text-[10px] border border-vg-border text-vg-gray px-2 py-0.5 uppercase tracking-wider whitespace-nowrap">
+            <span className="text-[10px] text-vg-gray uppercase tracking-wider truncate">
               {product.construction_type}
             </span>
           )}
         </div>
-        <h3 className="font-bold text-vg-white text-sm leading-tight mb-2 flex-1">
-          {product.name}
-        </h3>
-        {product.category && (
-          <p className="text-vg-gray text-xs mb-3">{product.category}</p>
-        )}
-        <div className="flex gap-2 mt-auto">
+
+        {/* Action Buttons */}
+        <div className="flex gap-1.5 sm:gap-2 mt-auto">
+          {/* Add to Cart */}
+          <button
+            onClick={handleAddToCart}
+            disabled={isOutOfStock}
+            className={`shrink-0 flex items-center justify-center px-2.5 sm:px-3 py-2 text-xs font-semibold uppercase tracking-wider border rounded transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed ${
+              inCart
+                ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10'
+                : 'border-vg-border text-vg-gray hover:border-vg-white hover:text-vg-white'
+            }`}
+            title={inCart ? 'Sudah di keranjang' : 'Tambah ke keranjang'}
+          >
+            {inCart ? <Check size={13} /> : <ShoppingCart size={13} />}
+          </button>
+
+          {/* Detail / Beli */}
           <Link
             to={`/wheels/${product.id}`}
-            className="flex-1 text-center btn-primary text-xs py-2"
+            className="flex-1 min-w-0 text-center bg-vg-white text-vg-black font-semibold uppercase tracking-wider sm:tracking-widest hover:bg-vg-accent transition-colors duration-200 text-[11px] sm:text-xs py-2 px-2 sm:px-4 whitespace-nowrap flex items-center justify-center"
           >
-            View Details
+            Detail / Beli
           </Link>
+
+          {/* Remove from favorites (Favorites page) */}
           {showRemove && (
             <button
               onClick={() => removeFavorite(product.id)}
-              className="btn-outline text-xs py-2 px-3"
+              className="shrink-0 btn-outline text-[11px] sm:text-xs py-2 px-2.5 sm:px-3"
             >
-              Remove
+              Hapus
             </button>
           )}
         </div>

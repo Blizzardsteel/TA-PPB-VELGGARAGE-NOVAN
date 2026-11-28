@@ -146,14 +146,14 @@ export default function FilterPanel({ filters, onChange, brands = [], categories
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onClose}
-              className="fixed inset-0 bg-vg-black/80 z-40 md:hidden"
+              className="fixed inset-0 bg-vg-black/80 z-[55] md:hidden"
             />
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'tween', duration: 0.3 }}
-              className="fixed left-0 top-0 bottom-0 w-80 bg-vg-dark z-50 p-6 overflow-y-auto md:hidden"
+              className="fixed left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-vg-dark z-[60] p-6 overflow-y-auto md:hidden"
             >
               <FilterContent />
             </motion.div>

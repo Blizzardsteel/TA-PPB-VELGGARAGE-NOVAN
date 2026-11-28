@@ -24,7 +24,7 @@ export default function Brands() {
         </p>
       </div>
 
-      {error ? (
+      {error && brands.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <AlertCircle size={40} className="text-vg-gray" />
           <p className="text-vg-gray text-sm max-w-sm">{error}</p>

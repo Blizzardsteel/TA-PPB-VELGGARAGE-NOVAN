@@ -7,6 +7,45 @@ import LoadingSkeleton from '../components/LoadingSkeleton';
 import FilterPanel from '../components/FilterPanel';
 import SearchBar from '../components/SearchBar';
 import { productsApi, brandsApi, categoriesApi } from '../services/api';
+import { fallbackProducts, fallbackBrands } from '../data/fallbackCatalog';
+
+function filterFallback(list, currentFilters, q) {
+  let result = [...list];
+  if (currentFilters.brand) {
+    result = result.filter(
+      (p) =>
+        p.brand?.slug === currentFilters.brand ||
+        String(p.brand_id) === String(currentFilters.brand) ||
+        p.brand?.name?.toLowerCase() === currentFilters.brand.toLowerCase()
+    );
+  }
+  if (currentFilters.category) {
+    result = result.filter(
+      (p) => p.category && p.category.toLowerCase() === currentFilters.category.toLowerCase()
+    );
+  }
+  if (currentFilters.construction_type) {
+    result = result.filter(
+      (p) =>
+        p.construction_type &&
+        p.construction_type.toLowerCase() === currentFilters.construction_type.toLowerCase()
+    );
+  }
+  if (q) {
+    const term = q.toLowerCase();
+    result = result.filter(
+      (p) =>
+        p.name.toLowerCase().includes(term) ||
+        p.model.toLowerCase().includes(term) ||
+        (p.brand?.name && p.brand.name.toLowerCase().includes(term))
+    );
+  }
+  if (currentFilters.sort === 'name_asc') result.sort((a, b) => a.name.localeCompare(b.name));
+  if (currentFilters.sort === 'name_desc') result.sort((a, b) => b.name.localeCompare(a.name));
+  if (currentFilters.sort === 'newest') result.sort((a, b) => b.id - a.id);
+  if (currentFilters.sort === 'featured') result.sort((a, b) => (b.is_featured ? 1 : 0) - (a.is_featured ? 1 : 0));
+  return result;
+}
 
 const containerVariants = {
   hidden: {},
@@ -15,11 +54,6 @@ const containerVariants = {
 
 export default function Wheels() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [products, setProducts] = useState([]);
-  const [brands, setBrands] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
 
@@ -29,6 +63,12 @@ export default function Wheels() {
     construction_type: searchParams.get('construction_type') || '',
     sort: searchParams.get('sort') || '',
   });
+
+  const [products, setProducts] = useState(() => filterFallback(fallbackProducts, filters, searchQuery));
+  const [brands, setBrands] = useState(fallbackBrands);
+  const [categories, setCategories] = useState(['Custom', 'Racing', 'Sport']);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const fetchProducts = useCallback(async (currentFilters, q) => {
     try {
@@ -43,10 +83,16 @@ export default function Wheels() {
 
       const res = await productsApi.getAll(params);
       const data = res.data;
-      setProducts(Array.isArray(data) ? data : data.data || []);
+      const list = Array.isArray(data) ? data : data.data || [];
+      if (list.length > 0) {
+        setProducts(list);
+      } else {
+        setProducts(filterFallback(fallbackProducts, currentFilters, q));
+      }
     } catch (err) {
-      setError(err.message || 'Failed to load products');
-      setProducts([]);
+      console.warn('Wheels API error, using fallback:', err.message);
+      setProducts(filterFallback(fallbackProducts, currentFilters, q));
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -59,12 +105,14 @@ export default function Wheels() {
   useEffect(() => {
     brandsApi.getAll().then((r) => {
       const d = r.data;
-      setBrands(Array.isArray(d) ? d : d.data || []);
+      const list = Array.isArray(d) ? d : d.data || [];
+      if (list.length > 0) setBrands(list);
     }).catch(() => {});
 
     categoriesApi.getAll().then((r) => {
       const d = r.data;
-      setCategories(Array.isArray(d) ? d : d.data || []);
+      const list = Array.isArray(d) ? d : d.data || [];
+      if (list.length > 0) setCategories(list);
     }).catch(() => {});
   }, []);
 
@@ -95,18 +143,18 @@ export default function Wheels() {
       </div>
 
       {/* Search + Filter Toggle */}
-      <div className="flex gap-3 mb-8">
+      <div className="flex gap-2 sm:gap-3 mb-8">
         <SearchBar
           value={searchQuery}
           onChange={setSearchQuery}
           onSearch={handleSearch}
-          placeholder="Search wheels, brands, models..."
+          placeholder="Search wheels, brands..."
         />
         <button
           onClick={() => setFilterOpen(true)}
-          className="md:hidden flex items-center gap-2 btn-outline text-sm relative"
+          className="md:hidden shrink-0 flex items-center gap-1.5 border border-vg-border text-vg-white font-semibold uppercase tracking-wider px-3.5 py-2.5 text-xs hover:border-vg-white transition-colors relative"
         >
-          <SlidersHorizontal size={16} />
+          <SlidersHorizontal size={15} />
           Filters
           {activeFilterCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-vg-white text-vg-black text-[9px] font-bold rounded-full flex items-center justify-center">
@@ -137,7 +185,7 @@ export default function Wheels() {
             </p>
           )}
 
-          {error ? (
+          {error && products.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
               <AlertCircle size={40} className="text-vg-gray" />
               <p className="text-vg-gray text-sm max-w-sm">{error}</p>

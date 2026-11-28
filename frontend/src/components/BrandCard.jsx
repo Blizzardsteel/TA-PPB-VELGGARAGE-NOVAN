@@ -16,7 +16,7 @@ export default function BrandCard({ brand }) {
       className="card-base p-6 flex flex-col gap-3 group"
     >
       {/* Brand Image / Placeholder */}
-      <div className="w-16 h-16 bg-vg-dark border border-vg-border rounded flex items-center justify-center mb-2">
+      <div className="w-16 h-16 bg-vg-dark border border-vg-border rounded flex items-center justify-center mb-2 p-2 overflow-hidden">
         {brand.logo_url ? (
           <img
             src={brand.logo_url}

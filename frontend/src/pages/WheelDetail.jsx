@@ -1,26 +1,39 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, ArrowLeft, ExternalLink, AlertCircle } from 'lucide-react';
+import { Heart, ArrowLeft, ExternalLink, AlertCircle, ShoppingBag, ShoppingCart, ShieldCheck, Check, LogIn } from 'lucide-react';
 import { productsApi } from '../services/api';
 import { useFavorites } from '../context/FavoritesContext';
+import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
+import OrderModal from '../components/OrderModal';
+import AuthModal from '../components/AuthModal';
 import { DetailSkeleton, ProductCardSkeleton } from '../components/LoadingSkeleton';
+import { formatPrice } from '../utils/helpers';
+import { fallbackProducts } from '../data/fallbackCatalog';
 
 export default function WheelDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const { addToCart, isInCart } = useCart();
+  const { isLoggedIn } = useAuth();
 
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [imgError, setImgError] = useState(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [currentStock, setCurrentStock] = useState(null);
 
   const fav = product ? isFavorite(product.id) : false;
+  const inCart = product ? isInCart(product.id) : false;
 
   useEffect(() => {
+    setImgError(false);
     const fetchProduct = async () => {
       try {
         setLoading(true);
@@ -29,6 +42,7 @@ export default function WheelDetail() {
         const data = res.data;
         const prod = data.data || data;
         setProduct(prod);
+        setCurrentStock(prod.stock ?? 4);
 
         // Fetch related by brand
         if (prod.brand_id || prod.brand?.id) {
@@ -39,7 +53,19 @@ export default function WheelDetail() {
           setRelated(relArr.filter((p) => p.id !== prod.id).slice(0, 4));
         }
       } catch (err) {
-        setError(err.message || 'Failed to load product');
+        console.warn('API error on detail, using fallback:', err.message);
+        const fallback = fallbackProducts.find((p) => String(p.id) === String(id));
+        if (fallback) {
+          setProduct(fallback);
+          setCurrentStock(fallback.stock ?? 4);
+          const rel = fallbackProducts.filter(
+            (p) => p.brand_id === fallback.brand_id && p.id !== fallback.id
+          );
+          setRelated(rel.slice(0, 4));
+          setError(null);
+        } else {
+          setError(err.message || 'Failed to load product');
+        }
       } finally {
         setLoading(false);
       }
@@ -54,6 +80,19 @@ export default function WheelDetail() {
     } else {
       addFavorite(product);
     }
+  };
+
+  const handleAddToCart = () => {
+    if (!product || (currentStock ?? product.stock ?? 0) <= 0) return;
+    addToCart(product, 1);
+  };
+
+  const handleOrderClick = () => {
+    if (!isLoggedIn) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setIsOrderModalOpen(true);
   };
 
   const specValue = (val) => {
@@ -86,31 +125,51 @@ export default function WheelDetail() {
 
   if (!product) return null;
 
-  const specs = product.product_specifications || product.specifications || [];
+  const rawSpecs = product.product_specifications || product.specifications;
+  const specs = Array.isArray(rawSpecs) ? rawSpecs : [];
+
+  const uniqueSpecValues = (key, suffix = '') => {
+    const vals = specs
+      .map((s) => s?.[key])
+      .filter((v) => v !== null && v !== undefined && v !== '')
+      .map((v) => `${v}${suffix}`);
+    const unique = [...new Set(vals)];
+    return unique.length > 0 ? unique.join(', ') : null;
+  };
+
+  const aggregatedSpecs = [
+    { label: 'Diameter', value: uniqueSpecValues('diameter', '"') },
+    { label: 'Width', value: uniqueSpecValues('width', '"') },
+    { label: 'PCD', value: uniqueSpecValues('pcd') },
+    { label: 'Offset', value: uniqueSpecValues('offset_range') },
+    { label: 'Finish', value: uniqueSpecValues('finish') },
+    { label: 'Weight', value: uniqueSpecValues('weight_kg', ' kg') },
+    { label: 'Load Rating', value: uniqueSpecValues('load_rating', ' kg') },
+  ].filter((row) => row.value !== null);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-6 py-10">
+    <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-10">
       {/* Back */}
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-2 text-vg-gray hover:text-vg-white text-sm uppercase tracking-widest mb-8 transition-colors"
+        className="flex items-center gap-2 text-vg-gray hover:text-vg-white text-xs sm:text-sm uppercase tracking-widest mb-6 md:mb-8 transition-colors"
       >
         <ArrowLeft size={16} /> Back to Catalog
       </button>
 
-      <div className="grid md:grid-cols-2 gap-10 mb-16">
+      <div className="grid md:grid-cols-2 gap-6 md:gap-10 mb-12 md:mb-16">
         {/* Image */}
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="relative aspect-square bg-vg-dark border border-vg-border overflow-hidden"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="relative aspect-square bg-vg-dark border border-vg-border overflow-hidden flex items-center justify-center p-4 sm:p-6"
         >
           {product.image_url && !imgError ? (
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               onError={() => setImgError(true)}
             />
           ) : (
@@ -125,10 +184,10 @@ export default function WheelDetail() {
 
         {/* Details */}
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="flex flex-col gap-6"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.05 }}
+          className="flex flex-col gap-5 md:gap-6 min-w-0"
         >
           <div>
             <p className="text-vg-gray text-xs uppercase tracking-[0.3em] mb-1">
@@ -169,90 +228,166 @@ export default function WheelDetail() {
           )}
 
           {/* Specifications */}
-          {specs.length > 0 && (
+          {aggregatedSpecs.length > 0 && (
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-widest text-vg-accent mb-3">
                 Specifications
               </h3>
               <div className="border border-vg-border divide-y divide-vg-border">
-                {specs.map((spec, i) => (
-                  <div key={i} className="grid grid-cols-2 text-sm">
-                    {spec.diameter !== undefined && (
-                      <>
-                        <div className="px-4 py-2.5 text-vg-gray text-xs uppercase tracking-wider">Diameter</div>
-                        <div className="px-4 py-2.5 text-vg-white text-xs">{specValue(spec.diameter)}{spec.diameter ? '"' : ''}</div>
-                      </>
-                    )}
-                    {spec.width !== undefined && (
-                      <>
-                        <div className="px-4 py-2.5 text-vg-gray text-xs uppercase tracking-wider border-t border-vg-border">Width</div>
-                        <div className="px-4 py-2.5 text-vg-white text-xs border-t border-vg-border">{specValue(spec.width)}{spec.width ? '"' : ''}</div>
-                      </>
-                    )}
-                    {spec.pcd !== undefined && (
-                      <>
-                        <div className="px-4 py-2.5 text-vg-gray text-xs uppercase tracking-wider border-t border-vg-border">PCD</div>
-                        <div className="px-4 py-2.5 text-vg-white text-xs border-t border-vg-border">{specValue(spec.pcd)}</div>
-                      </>
-                    )}
-                    {spec.offset_range !== undefined && (
-                      <>
-                        <div className="px-4 py-2.5 text-vg-gray text-xs uppercase tracking-wider border-t border-vg-border">Offset</div>
-                        <div className="px-4 py-2.5 text-vg-white text-xs border-t border-vg-border">{specValue(spec.offset_range)}</div>
-                      </>
-                    )}
-                    {spec.finish !== undefined && (
-                      <>
-                        <div className="px-4 py-2.5 text-vg-gray text-xs uppercase tracking-wider border-t border-vg-border">Finish</div>
-                        <div className="px-4 py-2.5 text-vg-white text-xs border-t border-vg-border">{specValue(spec.finish)}</div>
-                      </>
-                    )}
-                    {spec.weight_kg !== undefined && (
-                      <>
-                        <div className="px-4 py-2.5 text-vg-gray text-xs uppercase tracking-wider border-t border-vg-border">Weight</div>
-                        <div className="px-4 py-2.5 text-vg-white text-xs border-t border-vg-border">{specValue(spec.weight_kg)}{spec.weight_kg ? ' kg' : ''}</div>
-                      </>
-                    )}
-                    {spec.load_rating !== undefined && (
-                      <>
-                        <div className="px-4 py-2.5 text-vg-gray text-xs uppercase tracking-wider border-t border-vg-border">Load Rating</div>
-                        <div className="px-4 py-2.5 text-vg-white text-xs border-t border-vg-border">{specValue(spec.load_rating)}{spec.load_rating ? ' kg' : ''}</div>
-                      </>
-                    )}
+                {aggregatedSpecs.map((row) => (
+                  <div key={row.label} className="grid grid-cols-2 text-sm">
+                    <div className="px-4 py-2.5 text-vg-gray text-xs uppercase tracking-wider">
+                      {row.label}
+                    </div>
+                    <div className="px-4 py-2.5 text-vg-white text-xs font-medium">
+                      {row.value}
+                    </div>
                   </div>
                 ))}
               </div>
+              {specs.length > 1 && (
+                <div className="mt-3">
+                  <p className="text-[10px] uppercase tracking-widest text-vg-gray mb-2">
+                    Available Fitments
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {specs.map((spec, idx) => (
+                      <span
+                        key={spec.id || idx}
+                        className="text-[11px] bg-vg-dark border border-vg-border text-vg-gray px-2.5 py-1 rounded"
+                      >
+                        {spec.diameter ? `${spec.diameter}"` : ''}
+                        {spec.width ? ` × ${spec.width}"` : ''}
+                        {spec.pcd ? ` · ${spec.pcd}` : ''}
+                        {spec.offset_range ? ` · ${spec.offset_range}` : ''}
+                        {spec.finish ? ` · ${spec.finish}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Price */}
-          <div className="border border-vg-border p-4">
-            <p className="text-vg-gray text-xs uppercase tracking-widest mb-1">Price</p>
-            <p className="text-vg-white font-semibold text-sm">Hubungi distributor resmi</p>
+          {/* Price & Stock Section */}
+          <div className="border border-vg-border p-5 bg-vg-dark/40 rounded">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <p className="text-vg-gray text-[10px] uppercase tracking-widest mb-1">Harga Resmi Distributor</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl md:text-3xl font-black text-vg-white tracking-tight">
+                    {formatPrice(product.price || 45000000)}
+                  </span>
+                  <span className="text-xs text-vg-gray">/ 1 set (4 pcs)</span>
+                </div>
+              </div>
+
+              {/* Stock Indicator Badge */}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded border ${
+                    (currentStock ?? product.stock ?? 4) <= 2
+                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full animate-pulse bg-current" />
+                  {(currentStock ?? product.stock ?? 4) <= 0
+                    ? 'Stok Habis'
+                    : `Sisa ${(currentStock ?? product.stock ?? 4)} Set Siap Kirim`}
+                </span>
+              </div>
+            </div>
+
+            {/* Buy / Order Button */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
+              {/* Add to Cart */}
+              <button
+                onClick={handleAddToCart}
+                disabled={(currentStock ?? product.stock ?? 4) <= 0}
+                className={`flex items-center justify-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                  inCart
+                    ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10'
+                    : 'border-vg-border text-vg-gray hover:border-vg-white hover:text-vg-white'
+                }`}
+              >
+                {inCart ? <Check size={16} /> : <ShoppingCart size={16} />}
+                {inCart ? 'Di Keranjang' : 'Keranjang'}
+              </button>
+
+              {/* Pesan / Beli */}
+              <button
+                onClick={handleOrderClick}
+                disabled={(currentStock ?? product.stock ?? 4) <= 0}
+                className="flex-1 btn-primary py-3 px-4 text-xs tracking-widest font-black uppercase flex items-center justify-center gap-2 shadow-lg hover:shadow-white/10 transition-all disabled:opacity-40"
+              >
+                <ShoppingBag size={18} />
+                {!isLoggedIn
+                  ? 'LOGIN UNTUK MEMESAN'
+                  : (currentStock ?? product.stock ?? 4) <= 0
+                  ? 'STOK SAAT INI HABIS'
+                  : 'PESAN / BELI SEKARANG'}
+              </button>
+            </div>
+
+            {!isLoggedIn && (
+              <p className="text-center text-[11px] text-vg-gray mb-2">
+                <span className="text-amber-400">⚠</span> Kamu perlu{' '}
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="text-vg-white underline"
+                >
+                  login
+                </button>{' '}
+                terlebih dahulu untuk memesan.
+              </p>
+            )}
+
+            <div className="flex items-center justify-center gap-2 text-[11px] text-vg-gray">
+              <ShieldCheck size={14} className="text-emerald-400" />
+              <span>Garansi 100% Produk Original & Konsultasi Fitment Gratis</span>
+            </div>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
             <button
               onClick={handleFavToggle}
-              className={`flex items-center gap-2 btn-outline text-sm flex-1 justify-center ${fav ? 'border-vg-white text-vg-white' : ''}`}
+              className={`flex items-center gap-2 btn-outline text-xs sm:text-sm px-4 py-3 flex-1 justify-center ${fav ? 'border-vg-white text-vg-white' : ''}`}
             >
               <Heart size={16} fill={fav ? 'currentColor' : 'none'} />
-              {fav ? 'Saved' : 'Save to Favorites'}
+              {fav ? 'Saved in Wishlist' : 'Add to Wishlist'}
             </button>
             {product.manufacturer_source_url && (
               <a
                 href={product.manufacturer_source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-outline text-sm flex items-center gap-2"
+                className="btn-outline text-xs sm:text-sm px-4 py-3 flex items-center justify-center gap-2"
               >
-                <ExternalLink size={16} /> Source
+                <ExternalLink size={16} /> Website Resmi
               </a>
             )}
           </div>
         </motion.div>
       </div>
+
+      {/* Order Modal */}
+      <OrderModal
+        isOpen={isOrderModalOpen}
+        product={{ ...product, stock: currentStock ?? product.stock ?? 4 }}
+        onClose={() => setIsOrderModalOpen(false)}
+        onOrderSuccess={(prodId, orderedQty) => {
+          setCurrentStock((prev) => Math.max(0, (prev ?? 4) - orderedQty));
+        }}
+      />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialTab="login"
+      />
 
       {/* Related Products */}
       {related.length > 0 && (

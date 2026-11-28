@@ -6,16 +6,17 @@ import BrandCard from '../components/BrandCard';
 import { ProductCardSkeleton, BrandCardSkeleton } from '../components/LoadingSkeleton';
 import { useProducts } from '../hooks/useProducts';
 import { useBrands } from '../hooks/useBrands';
-import { ArrowRight, AlertCircle } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { fallbackProducts, fallbackBrands } from '../data/fallbackCatalog';
 
 const sectionVariants = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
 };
 
 const containerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.1 } },
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
 };
 
 const constructionTypes = [
@@ -27,11 +28,18 @@ const constructionTypes = [
 ];
 
 export default function Home() {
-  const { products: featured, loading: featLoading, error: featError } = useProducts({ featured: true });
-  const { brands, loading: brandsLoading, error: brandsError } = useBrands();
+  const { products: featured, loading: featLoading } = useProducts({ featured: true });
+  const { brands, loading: brandsLoading } = useBrands();
 
-  const displayFeatured = featured.slice(0, 4);
-  const displayBrands = brands.slice(0, 6);
+  const displayFeatured = (featured && featured.length > 0
+    ? featured
+    : fallbackProducts.filter((p) => p.is_featured)
+  ).slice(0, 4);
+
+  const displayBrands = (brands && brands.length > 0
+    ? brands
+    : fallbackBrands
+  ).slice(0, 6);
 
   return (
     <div>
@@ -39,13 +47,13 @@ export default function Home() {
       <HeroSection />
 
       {/* Featured Collections */}
-      <section className="py-20 max-w-7xl mx-auto px-4 md:px-6">
+      <section className="py-12 md:py-20 max-w-7xl mx-auto px-4 md:px-6">
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: '-100px' }}
+          viewport={{ once: true, amount: 0.01 }}
           variants={sectionVariants}
-          className="flex items-end justify-between mb-10"
+          className="flex items-end justify-between mb-8 md:mb-10"
         >
           <div>
             <p className="text-vg-gray text-xs uppercase tracking-[0.3em] mb-2">Handpicked</p>
@@ -56,30 +64,17 @@ export default function Home() {
           </Link>
         </motion.div>
 
-        {featError ? (
-          <div className="flex items-center gap-3 text-vg-gray p-6 border border-vg-border">
-            <AlertCircle size={20} />
-            <p className="text-sm">Could not load featured products. API may be unavailable.</p>
-          </div>
-        ) : (
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-50px' }}
-            variants={containerVariants}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4"
-          >
-            {featLoading
-              ? Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)
-              : displayFeatured.length > 0
-              ? displayFeatured.map((p) => <ProductCard key={p.id} product={p} />)
-              : Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="card-base p-6 flex flex-col items-center justify-center aspect-square text-vg-gray text-sm">
-                    <span className="text-xs uppercase tracking-widest">No data yet</span>
-                  </div>
-                ))}
-          </motion.div>
-        )}
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.05 }}
+          variants={containerVariants}
+          className="grid grid-cols-2 md:grid-cols-4 gap-4"
+        >
+          {displayFeatured.map((p) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
+        </motion.div>
 
         <div className="mt-6 md:hidden">
           <Link to="/wheels" className="btn-outline w-full text-center block">
@@ -89,14 +84,14 @@ export default function Home() {
       </section>
 
       {/* Popular Brands */}
-      <section className="py-20 bg-vg-dark">
+      <section className="py-12 md:py-20 bg-vg-dark">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <motion.div
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, margin: '-100px' }}
+            viewport={{ once: true, amount: 0.01 }}
             variants={sectionVariants}
-            className="flex items-end justify-between mb-10"
+            className="flex items-end justify-between mb-8 md:mb-10"
           >
             <div>
               <p className="text-vg-gray text-xs uppercase tracking-[0.3em] mb-2">Top Manufacturers</p>
@@ -107,41 +102,28 @@ export default function Home() {
             </Link>
           </motion.div>
 
-          {brandsError ? (
-            <div className="flex items-center gap-3 text-vg-gray p-6 border border-vg-border">
-              <AlertCircle size={20} />
-              <p className="text-sm">Could not load brands. API may be unavailable.</p>
-            </div>
-          ) : (
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: '-50px' }}
-              variants={containerVariants}
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
-            >
-              {brandsLoading
-                ? Array.from({ length: 6 }).map((_, i) => <BrandCardSkeleton key={i} />)
-                : displayBrands.length > 0
-                ? displayBrands.map((b) => <BrandCard key={b.id} brand={b} />)
-                : (
-                  <div className="col-span-3 text-center py-16 text-vg-gray">
-                    <p className="text-sm uppercase tracking-widest">No brands available yet</p>
-                  </div>
-                )}
-            </motion.div>
-          )}
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.01 }}
+            variants={containerVariants}
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
+          >
+            {displayBrands.map((b) => (
+              <BrandCard key={b.id} brand={b} />
+            ))}
+          </motion.div>
         </div>
       </section>
 
       {/* Explore by Type */}
-      <section className="py-20 max-w-7xl mx-auto px-4 md:px-6">
+      <section className="py-12 md:py-20 max-w-7xl mx-auto px-4 md:px-6">
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: '-100px' }}
+          viewport={{ once: true, amount: 0.01 }}
           variants={sectionVariants}
-          className="mb-10"
+          className="mb-8 md:mb-10"
         >
           <p className="text-vg-gray text-xs uppercase tracking-[0.3em] mb-2">By Construction</p>
           <h2 className="section-title">Explore by Type</h2>
@@ -150,7 +132,7 @@ export default function Home() {
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: '-50px' }}
+          viewport={{ once: true, amount: 0.01 }}
           variants={containerVariants}
           className="grid grid-cols-2 md:grid-cols-5 gap-3"
         >
@@ -172,11 +154,11 @@ export default function Home() {
       </section>
 
       {/* Editorial Banner */}
-      <section className="py-24 bg-vg-dark border-t border-b border-vg-border">
+      <section className="py-16 md:py-24 bg-vg-dark border-t border-b border-vg-border">
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: '-100px' }}
+          viewport={{ once: true, amount: 0.01 }}
           variants={sectionVariants}
           className="max-w-7xl mx-auto px-4 md:px-6 text-center"
         >
